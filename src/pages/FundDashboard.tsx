@@ -6,7 +6,7 @@ import { FundHeader } from '../components/FundHeader';
 import { TransactionTimeline } from '../components/TransactionTimeline';
 import { AddContributionModal } from '../components/AddContributionModal';
 import { AddExpenseModal } from '../components/AddExpenseModal';
-// import { useAuth } from '../contexts/AuthContext'; // not used
+
 
 export default function FundDashboard() {
   const { fundId } = useParams<{ fundId: string }>();
