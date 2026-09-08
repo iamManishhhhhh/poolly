@@ -6,15 +6,19 @@ import { FundHeader } from '../components/FundHeader';
 import { TransactionTimeline } from '../components/TransactionTimeline';
 import { AddContributionModal } from '../components/AddContributionModal';
 import { AddExpenseModal } from '../components/AddExpenseModal';
-
+import { InviteModal } from '../components/InviteModal';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function FundDashboard() {
   const { fundId } = useParams<{ fundId: string }>();
-  // const { user } = useAuth(); // not used currently
+  const { user } = useAuth();
   const [fund, setFund] = useState<Fund | null>(null);
   const [loading, setLoading] = useState(true);
   const [showContributionModal, setShowContributionModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string>('');
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   const fetchFund = async () => {
     if (!fundId) return;
@@ -37,6 +41,7 @@ export default function FundDashboard() {
         startDate: data.start_date,
         endDate: data.end_date,
         currency: data.currency,
+        ownerId: data.owner_id,
         members: data.members || [],
         contributions: data.contributions || [],
         expenses: data.expenses || [],
@@ -44,6 +49,27 @@ export default function FundDashboard() {
       setFund(f);
     }
     setLoading(false);
+  };
+
+  const createInvite = async () => {
+    if (!fund || !user) return;
+    setInviteLoading(true);
+
+    const code = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+    const { error } = await supabase.from('fund_invites').insert([
+      {
+        fund_id: fund.id,
+        code,
+        created_by: user.id,
+      },
+    ]);
+    if (error) {
+      console.error(error.message);
+    } else {
+      setInviteCode(code);
+      setShowInviteModal(true);
+    }
+    setInviteLoading(false);
   };
 
   useEffect(() => {
@@ -77,10 +103,25 @@ export default function FundDashboard() {
         <button onClick={() => setShowExpenseModal(true)} className="bg-red-600 text-white px-4 py-2 rounded">
           Add Expense
         </button>
+        {user?.id === fund.ownerId && (
+          <button
+            onClick={createInvite}
+            disabled={inviteLoading}
+            className="bg-blue-600 text-white px-4 py-2 rounded"
+          >
+            {inviteLoading ? 'Generating...' : 'Invite / Share'}
+          </button>
+        )}
       </div>
       <TransactionTimeline contributions={fund.contributions} expenses={fund.expenses} />
       <AddContributionModal fundId={fund.id} isOpen={showContributionModal} onClose={() => setShowContributionModal(false)} onAdded={fetchFund} />
       <AddExpenseModal fundId={fund.id} isOpen={showExpenseModal} onClose={() => setShowExpenseModal(false)} onAdded={fetchFund} />
+      <InviteModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        inviteCode={inviteCode}
+        fundName={fund.name}
+      />
     </div>
   );
 }

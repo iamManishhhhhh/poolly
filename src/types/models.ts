@@ -15,6 +15,7 @@ export interface Fund {
   startDate: string;
   endDate?: string;
   currency: string;
+  ownerId?: string;
   members: FundMember[];
   contributions: Contribution[];
   expenses: Expense[];
@@ -60,3 +61,12 @@ export interface Transaction {
   status: string;
   referenceId: string;
 }
+
+export interface Invite {
+  id: string;
+  fund_id: string;
+  code: string;
+  created_at: string;
+  created_by: string;
+}
+

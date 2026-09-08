@@ -10,6 +10,7 @@ import ExpensesPage from './pages/ExpensesPage';
 import LedgerPage from './pages/LedgerPage';
 import MembersPage from './pages/MembersPage';
 import FundSettingsPage from './pages/FundSettingsPage';
+import JoinFundPage from './pages/JoinFundPage';
 import { Navbar } from './components/Navbar';
 import { PrivateRoute } from './components/PrivateRoute';
 
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/funds/:fundId/ledger" element={<LedgerPage />} />
         <Route path="/funds/:fundId/members" element={<MembersPage />} />
         <Route path="/funds/:fundId/settings" element={<FundSettingsPage />} />
+        <Route path="/join/:code" element={<PrivateRoute><JoinFundPage /></PrivateRoute>} />
       </Routes>
     </>
   );
