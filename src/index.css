@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  /* Primary accent color */
+  --color-primary: #047857; /* emerald green */
+  /* Light neutral background for the whole page */
+  --color-background: #FAFAF8; /* warm off-white */
+  /* Surface colors (not used heavily in this redesign) */
+  --color-surface: #F5F5F5;
+  --color-surface-light: #FFFFFF;
+}
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    background-color: var(--color-background);
+    @apply text-[#171717];
+  }
+}
