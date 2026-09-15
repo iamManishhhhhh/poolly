@@ -22,13 +22,14 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth/*" element={<AuthPage />} />
         <Route path="/dashboard" element={<PrivateRoute><UserDashboard /></PrivateRoute>} />
-        <Route path="/funds/create" element={<CreateFundPage />} />
-        <Route path="/funds/:fundId" element={<FundDashboard />} />
-        <Route path="/funds/:fundId/contributions" element={<ContributionsPage />} />
-        <Route path="/funds/:fundId/expenses" element={<ExpensesPage />} />
-        <Route path="/funds/:fundId/ledger" element={<LedgerPage />} />
-        <Route path="/funds/:fundId/members" element={<MembersPage />} />
-        <Route path="/funds/:fundId/settings" element={<FundSettingsPage />} />
+        <Route path="/funds/create" element={<PrivateRoute><CreateFundPage /></PrivateRoute>} />
+        <Route path="/funds/:fundId" element={<PrivateRoute><FundDashboard /></PrivateRoute>} />
+        <Route path="/funds/:fundId/contributions" element={<PrivateRoute><ContributionsPage /></PrivateRoute>} />
+        <Route path="/funds/:fundId/expenses" element={<PrivateRoute><ExpensesPage /></PrivateRoute>} />
+        <Route path="/funds/:fundId/ledger" element={<PrivateRoute><LedgerPage /></PrivateRoute>} />
+        <Route path="/funds/:fundId/members" element={<PrivateRoute><MembersPage /></PrivateRoute>} />
+        <Route path="/funds/:fundId/settings" element={<PrivateRoute><FundSettingsPage /></PrivateRoute>} />
+        <Route path="/join" element={<PrivateRoute><JoinFundPage /></PrivateRoute>} />
         <Route path="/join/:code" element={<PrivateRoute><JoinFundPage /></PrivateRoute>} />
       </Routes>
     </>

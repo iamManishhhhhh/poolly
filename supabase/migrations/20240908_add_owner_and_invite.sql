@@ -50,10 +50,14 @@ ALTER TABLE IF EXISTS public.fund_members ENABLE ROW LEVEL SECURITY;
 -- a) Owner can create invites for their own funds
 CREATE POLICY "Owners can create invites" ON public.fund_invites
   FOR INSERT TO authenticated
-  USING (
-    auth.uid() = created_by AND
-    EXISTS (SELECT 1 FROM public.funds f WHERE f.id = fund_id AND f.owner_id = auth.uid())
-  );
+  WITH CHECK (
+  auth.uid() = created_by AND
+  EXISTS (
+    SELECT 1 FROM public.funds f
+    WHERE f.id = fund_id
+      AND f.owner_id = auth.uid()
+  )
+);
 
 -- b) Any authenticated user can read a valid invite (to validate code)
 CREATE POLICY "Authenticated can select invites" ON public.fund_invites
