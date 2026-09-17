@@ -45,8 +45,8 @@ export default function UserDashboard() {
       const { data: contribsData } = await supabase.from('contributions').select('*').in('fund_id', idArray);
       const { data: expensesData } = await supabase.from('expenses').select('*').in('fund_id', idArray);
 
-      const mappedFunds: Fund[] = (allFundsData || []).map(f => {
-        const fundContribs = (contribsData || []).filter(c => c.fund_id === f.id).map((c: any) => ({
+      const mappedFunds: Fund[] = (allFundsData || []).map((f: any) => {
+        const fundContribs = (contribsData || []).filter((c: any) => c.fund_id === f.id).map((c: any) => ({
           id: c.id,
           fundId: c.fund_id,
           contributorId: c.contributor_id,
@@ -55,7 +55,7 @@ export default function UserDashboard() {
           status: c.status,
           note: c.note,
         }));
-        const fundExpenses = (expensesData || []).filter(e => e.fund_id === f.id).map((e: any) => ({
+        const fundExpenses = (expensesData || []).filter((e: any) => e.fund_id === f.id).map((e: any) => ({
           id: e.id,
           fundId: e.fund_id,
           addedById: e.added_by_id,
@@ -122,9 +122,12 @@ export default function UserDashboard() {
           <FundCard key={fund.id} fund={fund} />
         ))}
       </div>
-      <div className="mt-8">
+      <div className="mt-8 flex gap-4">
         <Link to="/funds/create" className="text-primary hover:underline">
           + Create a new fund
+        </Link>
+        <Link to="/join" className="text-primary hover:underline">
+          Join a Fund
         </Link>
       </div>
     </div>

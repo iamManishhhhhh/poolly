@@ -18,6 +18,8 @@ export default function FundDashboard() {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string>('');
+  const [inviteExpiresAt, setInviteExpiresAt] = useState<string | undefined>(undefined);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
 
   const fetchFund = useCallback(async () => {
@@ -108,9 +110,18 @@ export default function FundDashboard() {
   const createInvite = async () => {
     if (!fund || !user) return;
     setInviteLoading(true);
+    setInviteError(null);
 
-    const code = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+    // Generate a 12-char cryptographically random hex code
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    const code = Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+      .slice(0, 12);
+
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+
     const { error } = await supabase.from('fund_invites').insert([
       {
         fund_id: fund.id,
@@ -119,13 +130,22 @@ export default function FundDashboard() {
         expires_at: expiresAt,
       },
     ]);
+
     if (error) {
-      console.error(error.message);
+      console.error('Invite creation failed:', error.message);
+      setInviteError(
+        error.message.includes('duplicate') || error.code === '23505'
+          ? 'A code with this value already exists. Please try again.'
+          : error.message || 'Failed to create invite. Please try again.'
+      );
+      setInviteCode('');
+      setInviteExpiresAt(undefined);
     } else {
       setInviteCode(code);
-      setShowInviteModal(true);
+      setInviteExpiresAt(expiresAt);
     }
     setInviteLoading(false);
+    setShowInviteModal(true);
   };
 
   if (authLoading || loading) {
@@ -207,6 +227,8 @@ export default function FundDashboard() {
           onClose={() => setShowInviteModal(false)}
           inviteCode={inviteCode}
           fundName={fund.name}
+          expiresAt={inviteExpiresAt}
+          generateError={inviteError}
         />
       </div>
     </div>

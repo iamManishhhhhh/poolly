@@ -20,7 +20,7 @@ export default function LandingPage() {
           <Link to="/funds/create">
             <Button variant="primary">Create a Fund</Button>
           </Link>
-          <Link to="/auth/login">
+          <Link to="/join">
             <Button variant="secondary">Join a Fund</Button>
           </Link>
         </div>
