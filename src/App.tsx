@@ -13,6 +13,7 @@ import FundSettingsPage from './pages/FundSettingsPage';
 import JoinFundPage from './pages/JoinFundPage';
 import { Navbar } from './components/Navbar';
 import { PrivateRoute } from './components/PrivateRoute';
+import NotFoundPage from './pages/NotFoundPage';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/funds/:fundId/settings" element={<PrivateRoute><FundSettingsPage /></PrivateRoute>} />
         <Route path="/join" element={<PrivateRoute><JoinFundPage /></PrivateRoute>} />
         <Route path="/join/:code" element={<PrivateRoute><JoinFundPage /></PrivateRoute>} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
   );

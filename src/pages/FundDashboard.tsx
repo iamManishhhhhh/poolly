@@ -15,6 +15,7 @@ export default function FundDashboard() {
   const { user, loading: authLoading } = useAuth();
   const [fund, setFund] = useState<Fund | null>(null);
   const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
   const [showContributionModal, setShowContributionModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -26,6 +27,7 @@ export default function FundDashboard() {
   const fetchFund = useCallback(async () => {
     if (!fundId || !user) return;
     setLoading(true);
+    setError(null);
 
     // 1. Fetch fund record by primary key id
     const { data: fundData, error: fundError } = await supabase
@@ -33,33 +35,48 @@ export default function FundDashboard() {
       .select('*')
       .eq('id', fundId)
       .maybeSingle();
-
     if (fundError || !fundData) {
       console.error('Error fetching fund details:', fundError);
+      setError('Failed to load fund data.');
       setFund(null);
       setLoading(false);
       return;
     }
 
     // 2. Fetch members for this fund
-    const { data: membersData } = await supabase
+    const { data: membersData, error: membersError } = await supabase
       .from('fund_members')
       .select('*')
       .eq('fund_id', fundId);
+    if (membersError) {
+      setError('Failed to load members.');
+      setLoading(false);
+      return;
+    }
 
     // 3. Fetch contributions for this fund
-    const { data: contribsData } = await supabase
+    const { data: contribsData, error: contribsError } = await supabase
       .from('contributions')
       .select('*')
       .eq('fund_id', fundId)
       .order('date', { ascending: false });
+    if (contribsError) {
+      setError('Failed to load contributions.');
+      setLoading(false);
+      return;
+    }
 
     // 4. Fetch expenses for this fund
-    const { data: expensesData } = await supabase
+    const { data: expensesData, error: expensesError } = await supabase
       .from('expenses')
       .select('*')
       .eq('fund_id', fundId)
       .order('date', { ascending: false });
+    if (expensesError) {
+      setError('Failed to load expenses.');
+      setLoading(false);
+      return;
+    }
 
     // Map members, ensuring the owner is included as a member with admin role
     const mappedMembers = (membersData || []).map((m: any) => ({
@@ -199,6 +216,22 @@ export default function FundDashboard() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="p-6 bg-[#FAFAF8] min-h-screen text-[#171717] flex items-center justify-center">
+        <div className="max-w-md mx-auto bg-white rounded-xl shadow-md p-6 text-center border border-gray-200">
+          <p className="text-red-600 font-medium mb-4">{error}</p>
+          <button
+            onClick={fetchFund}
+            className="bg-[#087F5B] text-white px-4 py-2 rounded-md hover:bg-[#087F5B]/90 font-medium"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const totalCollected = fund.contributions?.reduce((sum, c) => sum + c.amount, 0) ?? 0;
   const totalSpent = fund.expenses?.reduce((sum, e) => sum + e.amount, 0) ?? 0;
   const balance = totalCollected - totalSpent;
@@ -210,12 +243,14 @@ export default function FundDashboard() {
       <div className="max-w-5xl mx-auto">
         <FundHeader fund={fund} totalCollected={totalCollected} totalSpent={totalSpent} balance={balance} />
         <div className="flex flex-wrap gap-4 mb-6 mt-4">
-          <button
-            onClick={() => setShowContributionModal(true)}
-            className="bg-[#087F5B] text-white px-4 py-2 rounded-md hover:bg-[#087F5B]/90 font-medium text-sm transition-colors"
-          >
-            Add Contribution
-          </button>
+          {isMember && (
+            <button
+              onClick={() => setShowContributionModal(true)}
+              className="bg-[#087F5B] text-white px-4 py-2 rounded-md hover:bg-[#087F5B]/90 font-medium text-sm transition-colors"
+            >
+              Add Contribution
+            </button>
+          )}
           {isMember && (
             <button
               onClick={() => setShowExpenseModal(true)}
