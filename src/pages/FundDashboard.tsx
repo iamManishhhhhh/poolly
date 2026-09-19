@@ -7,6 +7,7 @@ import { TransactionTimeline } from '../components/TransactionTimeline';
 import { AddContributionModal } from '../components/AddContributionModal';
 import { AddExpenseModal } from '../components/AddExpenseModal';
 import { InviteModal } from '../components/InviteModal';
+import { MemberList } from '../components/MemberList';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function FundDashboard() {
@@ -71,7 +72,12 @@ export default function FundDashboard() {
       endDate: fundData.end_date,
       currency: fundData.currency,
       ownerId: fundData.owner_id,
-      members: membersData || [],
+      members: (membersData || []).map((m: any) => ({
+        userId: m.user_id,
+        role: m.role,
+        joinedAt: m.joined_at,
+        totalContributed: Number(m.total_contributed),
+      })),
       contributions: (contribsData || []).map((c: any) => ({
         id: c.id,
         fundId: c.fund_id,
@@ -181,24 +187,28 @@ export default function FundDashboard() {
   const totalCollected = fund.contributions?.reduce((sum, c) => sum + c.amount, 0) ?? 0;
   const totalSpent = fund.expenses?.reduce((sum, e) => sum + e.amount, 0) ?? 0;
   const balance = totalCollected - totalSpent;
+  // Determine if current user is a member or owner of the fund
+  const isMember = fund && (fund.members?.some(m => m.userId === user?.id) || fund.ownerId === user?.id);
 
   return (
     <div className="min-h-screen bg-[#FAFAF8] text-[#171717] p-6">
       <div className="max-w-5xl mx-auto">
         <FundHeader fund={fund} totalCollected={totalCollected} totalSpent={totalSpent} balance={balance} />
-        <div className="flex gap-4 mb-6 mt-4">
+        <div className="flex flex-wrap gap-4 mb-6 mt-4">
           <button
             onClick={() => setShowContributionModal(true)}
             className="bg-[#087F5B] text-white px-4 py-2 rounded-md hover:bg-[#087F5B]/90 font-medium text-sm transition-colors"
           >
             Add Contribution
           </button>
-          <button
-            onClick={() => setShowExpenseModal(true)}
-            className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 font-medium text-sm transition-colors"
-          >
-            Add Expense
-          </button>
+          {isMember && (
+            <button
+              onClick={() => setShowExpenseModal(true)}
+              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 font-medium text-sm transition-colors"
+            >
+              Add Expense
+            </button>
+          )}
           {user?.id === fund.ownerId && (
             <button
               onClick={createInvite}
@@ -209,7 +219,16 @@ export default function FundDashboard() {
             </button>
           )}
         </div>
-        <TransactionTimeline contributions={fund.contributions} expenses={fund.expenses} />
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="md:col-span-2">
+            <TransactionTimeline contributions={fund.contributions} expenses={fund.expenses} />
+          </div>
+          <div className="md:col-span-1">
+            <MemberList members={fund.members} ownerId={fund.ownerId} currentUserId={user?.id} />
+          </div>
+        </div>
+
         <AddContributionModal
           fundId={fund.id}
           isOpen={showContributionModal}

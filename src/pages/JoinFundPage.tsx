@@ -27,7 +27,7 @@ export default function JoinFundPage() {
 
   const handleJoin = async () => {
     if (!user) { setError('Please log in to join a fund.'); return; }
-    const trimmed = codeInput.trim();
+    const trimmed = codeInput.trim().toLowerCase();
     if (!trimmed) { setError('Please enter a join code.'); return; }
     setJoining(true);
     setError(null);
@@ -38,7 +38,7 @@ export default function JoinFundPage() {
       const msg = (rpcError.message || '').toLowerCase();
       if (msg.includes('duplicate') || msg.includes('already')) {
         setError('You are already a member of this fund.');
-      } else if (msg.includes('expired') || msg.includes('invalid')) {
+      } else if (msg.includes('expired') || msg.includes('invalid') || msg.includes('not found')) {
         setError('Invalid or expired join code.');
       } else if (msg.includes('auth') || msg.includes('unauthenticated')) {
         setError('Please log in to join a fund.');
@@ -48,8 +48,17 @@ export default function JoinFundPage() {
       setJoining(false);
       return;
     }
-    const fundId = data?.fund_id;
+    
+    // The RPC might return a scalar UUID string or a JSON object with a fund_id property.
+    let fundId: string | undefined;
+    if (typeof data === 'string') {
+      fundId = data;
+    } else if (data && typeof data === 'object') {
+      fundId = (data as any).fund_id;
+    }
+
     if (!fundId) {
+      console.error('Unexpected RPC response format:', data);
       setError('Unable to determine fund after joining.');
       setJoining(false);
       return;
