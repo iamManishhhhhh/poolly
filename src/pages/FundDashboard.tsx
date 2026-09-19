@@ -61,6 +61,26 @@ export default function FundDashboard() {
       .eq('fund_id', fundId)
       .order('date', { ascending: false });
 
+    // Map members, ensuring the owner is included as a member with admin role
+    const mappedMembers = (membersData || []).map((m: any) => ({
+      userId: m.user_id,
+      role: m.role,
+      joinedAt: m.joined_at,
+      totalContributed: Number(m.total_contributed),
+    }));
+    // Add owner as a member if not already present
+    if (fundData.owner_id) {
+      const ownerExists = mappedMembers.some((m) => m.userId === fundData.owner_id);
+      if (!ownerExists) {
+        mappedMembers.unshift({
+          userId: fundData.owner_id,
+          role: 'admin',
+          joinedAt: fundData.created_at || new Date().toISOString(),
+          totalContributed: 0,
+        });
+      }
+    }
+
     const f: Fund = {
       id: fundData.id,
       name: fundData.name,
@@ -72,12 +92,7 @@ export default function FundDashboard() {
       endDate: fundData.end_date,
       currency: fundData.currency,
       ownerId: fundData.owner_id,
-      members: (membersData || []).map((m: any) => ({
-        userId: m.user_id,
-        role: m.role,
-        joinedAt: m.joined_at,
-        totalContributed: Number(m.total_contributed),
-      })),
+      members: mappedMembers,
       contributions: (contribsData || []).map((c: any) => ({
         id: c.id,
         fundId: c.fund_id,
