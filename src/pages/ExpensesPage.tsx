@@ -17,10 +17,10 @@ export default function ExpensesPage() {
     if (!fundId) return;
     setLoading(true);
     try {
-      // Load fund record
+      // Load fund record (select needed columns)
       const { data: fundData, error: fundError } = await supabase
         .from('funds')
-        .select('*')
+        .select('id, name, description, category, target_amount, suggested_contribution, start_date, end_date, currency, owner_id')
         .eq('id', fundId)
         .maybeSingle();
       if (fundError || !fundData) {
@@ -30,17 +30,24 @@ export default function ExpensesPage() {
       }
 
       // Load members for permission check
-      const { data: membersData } = await supabase
+      const { data: membersData, error: membersError } = await supabase
         .from('fund_members')
-        .select('*')
+        .select('user_id, role, joined_at, total_contributed')
         .eq('fund_id', fundId);
+
+      if (membersError) {
+        setError('Failed to load members');
+        setLoading(false);
+        return;
+      }
 
       // Load expenses
       const { data: expenseData, error: expenseError } = await supabase
         .from('expenses')
-        .select('*')
+        .select('id, fund_id, added_by_id, name, amount, vendor, category, date, receipt_url, status')
         .eq('fund_id', fundId)
         .order('date', { ascending: false });
+
       if (expenseError) {
         setError('Failed to load expenses');
         setLoading(false);

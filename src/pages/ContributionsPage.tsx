@@ -15,22 +15,25 @@ export default function ContributionsPage() {
       if (!fundId) return;
       setLoading(true);
       try {
-        // Fetch fund details
+        // Fetch fund details first
         const { data: fundData, error: fundError } = await supabase
           .from('funds')
-          .select('*')
+          .select('id, name, description, category, target_amount, suggested_contribution, start_date, end_date, currency, owner_id')
           .eq('id', fundId)
           .maybeSingle();
+
         if (fundError || !fundData) {
           setError('Failed to load fund');
           setLoading(false);
           return;
         }
+
         // Fetch contributions for this fund
         const { data: contribData, error: contribError } = await supabase
           .from('contributions')
-          .select('*')
+          .select('id, fund_id, contributor_id, amount, date, status, note')
           .eq('fund_id', fundId);
+
         if (contribError) {
           setError('Failed to load contributions');
           setLoading(false);
