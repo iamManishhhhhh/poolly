@@ -36,7 +36,7 @@ const [error, setError] = useState<string | null>(null);
   // 1. Fetch fund record (only needed columns)
   const { data: fundData, error: fundError } = await supabase
     .from('funds')
-    .select('id, name, description, category, target_amount, suggested_contribution, start_date, end_date, currency, owner_id, created_at')
+    .select('id, name, description, target_amount, suggested_contribution, start_date, end_date, currency, owner_id, created_at')
     .eq('id', fundId)
     .maybeSingle();
   if (fundError || !fundData) {
@@ -81,7 +81,6 @@ const [error, setError] = useState<string | null>(null);
     id: fundData.id,
     name: fundData.name,
     description: fundData.description,
-    category: fundData.category,
     targetAmount: fundData.target_amount,
     suggestedContribution: fundData.suggested_contribution,
     startDate: fundData.start_date,
@@ -176,6 +175,22 @@ const [error, setError] = useState<string | null>(null);
     );
   }
 
+  if (error) {
+    return (
+      <div className="p-6 bg-[#FAFAF8] min-h-screen text-[#171717] flex items-center justify-center">
+        <div className="max-w-md mx-auto bg-white rounded-xl shadow-md p-6 text-center border border-gray-200">
+          <p className="text-red-600 font-medium mb-4">{error}</p>
+          <button
+            onClick={fetchFund}
+            className="bg-[#087F5B] text-white px-4 py-2 rounded-md hover:bg-[#087F5B]/90 font-medium"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!fund) {
     return (
       <div className="p-6 text-[#171717] bg-[#FAFAF8] min-h-screen">
@@ -190,22 +205,6 @@ const [error, setError] = useState<string | null>(null);
           >
             ← Back to Dashboard
           </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6 bg-[#FAFAF8] min-h-screen text-[#171717] flex items-center justify-center">
-        <div className="max-w-md mx-auto bg-white rounded-xl shadow-md p-6 text-center border border-gray-200">
-          <p className="text-red-600 font-medium mb-4">{error}</p>
-          <button
-            onClick={fetchFund}
-            className="bg-[#087F5B] text-white px-4 py-2 rounded-md hover:bg-[#087F5B]/90 font-medium"
-          >
-            Retry
-          </button>
         </div>
       </div>
     );

@@ -18,7 +18,7 @@ export default function ContributionsPage() {
         // Fetch fund details first
         const { data: fundData, error: fundError } = await supabase
           .from('funds')
-          .select('id, name, description, category, target_amount, suggested_contribution, start_date, end_date, currency, owner_id')
+          .select('id, name, description, target_amount, suggested_contribution, start_date, end_date, currency, owner_id')
           .eq('id', fundId)
           .maybeSingle();
 
@@ -52,7 +52,6 @@ export default function ContributionsPage() {
           id: fundData.id,
           name: fundData.name,
           description: fundData.description,
-          category: fundData.category,
           targetAmount: fundData.target_amount,
           suggestedContribution: fundData.suggested_contribution,
           startDate: fundData.start_date,
