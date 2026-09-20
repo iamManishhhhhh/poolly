@@ -16,37 +16,29 @@ export default function UserDashboard() {
     if (!user) return;
     const fetchFunds = async () => {
       setLoading(true);
-      // Fetch funds owned by user or where user is a member
-      const { data: ownedData, error: ownedErr } = await supabase.from('funds').select('*').eq('owner_id', user.id);
-      const { data: memberRows } = await supabase.from('fund_members').select('fund_id').eq('user_id', user.id);
-
-      const fundIds = new Set<string>();
-      (ownedData || []).forEach(f => fundIds.add(f.id));
-      (memberRows || []).forEach(m => fundIds.add(m.fund_id));
-
-      if (fundIds.size === 0) {
-        setFunds([]);
-        setLoading(false);
-        return;
-      }
-
-      const idArray = Array.from(fundIds);
-      const { data: allFundsData, error: fundsErr } = await supabase
-        .from('funds')
-        .select('*')
-        .in('id', idArray);
-
-      if (fundsErr || ownedErr) {
-        setError(fundsErr?.message || ownedErr?.message || 'Error fetching funds');
-        setLoading(false);
-        return;
-      }
-
-      const { data: contribsData } = await supabase.from('contributions').select('*').in('fund_id', idArray);
-      const { data: expensesData } = await supabase.from('expenses').select('*').in('fund_id', idArray);
-
+      // Fetch owned funds and member fund ids in parallel (independent)
+      const [{ data: ownedData, error: ownedErr }, { data: memberRows, error: memberRowsErr }] = await Promise.all([
+        supabase.from('funds').select('*').eq('owner_id', user.id),
+        supabase.from('fund_members').select('fund_id').eq('user_id', user.id)
+      ]);
+      if (ownedErr) { setError(ownedErr.message); setLoading(false); return; }
+      if (memberRowsErr) { setError(memberRowsErr.message); setLoading(false); return; }
+      // Build set of fund IDs
+      const fundIdsSet = new Set<string>();
+      (ownedData || []).forEach(f => fundIdsSet.add(f.id));
+      (memberRows || []).forEach(m => fundIdsSet.add(m.fund_id));
+      const fundIds = Array.from(fundIdsSet);
+      if (fundIds.length === 0) { setFunds([]); setLoading(false); return; }
+      // Refetch all funds with full data
+      const { data: allFundsData, error: fundsErr } = await supabase.from('funds').select('*').in('id', fundIds);
+      if (fundsErr) { setError(fundsErr.message); setLoading(false); return; }
+      // Refetch contributions and expenses for these funds
+      const [{ data: contributions }, { data: expenses }] = await Promise.all([
+        supabase.from('contributions').select('*').in('fund_id', fundIds),
+        supabase.from('expenses').select('*').in('fund_id', fundIds)
+      ]);
       const mappedFunds: Fund[] = (allFundsData || []).map((f: any) => {
-        const fundContribs = (contribsData || []).filter((c: any) => c.fund_id === f.id).map((c: any) => ({
+        const fundContribs = (contributions || []).filter((c: any) => c.fund_id === f.id).map((c: any) => ({
           id: c.id,
           fundId: c.fund_id,
           contributorId: c.contributor_id,
@@ -55,7 +47,7 @@ export default function UserDashboard() {
           status: c.status,
           note: c.note,
         }));
-        const fundExpenses = (expensesData || []).filter((e: any) => e.fund_id === f.id).map((e: any) => ({
+        const fundExpenses = (expenses || []).filter((e: any) => e.fund_id === f.id).map((e: any) => ({
           id: e.id,
           fundId: e.fund_id,
           addedById: e.added_by_id,
@@ -67,7 +59,6 @@ export default function UserDashboard() {
           receiptUrl: e.receipt_url,
           status: e.status,
         }));
-
         return {
           id: f.id,
           name: f.name,
@@ -84,10 +75,9 @@ export default function UserDashboard() {
           expenses: fundExpenses,
         };
       });
-
-      setFunds(mappedFunds);
-      setLoading(false);
-    };
+    setFunds(mappedFunds);
+    setLoading(false);
+  };
     fetchFunds();
   }, [user]);
 

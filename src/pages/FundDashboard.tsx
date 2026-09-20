@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { Fund } from '../types/models';
@@ -23,119 +23,98 @@ const [error, setError] = useState<string | null>(null);
   const [inviteExpiresAt, setInviteExpiresAt] = useState<string | undefined>(undefined);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
-
+  // Derived memoized values for fund statistics and membership
+  const totalCollected = useMemo(() => fund?.contributions?.reduce((sum, c) => sum + c.amount, 0) ?? 0, [fund?.contributions]);
+  const totalSpent = useMemo(() => fund?.expenses?.reduce((sum, e) => sum + e.amount, 0) ?? 0, [fund?.expenses]);
+  const balance = useMemo(() => totalCollected - totalSpent, [totalCollected, totalSpent]);
+  const isMember = useMemo(() => fund && (fund.members?.some(m => m.userId === user?.id) || fund.ownerId === user?.id), [fund, user?.id]);
   const fetchFund = useCallback(async () => {
-    if (!fundId || !user) return;
-    setLoading(true);
-    setError(null);
+  if (!fundId || !user) return;
+  setLoading(true);
+  setError(null);
 
-    // 1. Fetch fund record by primary key id
-    const { data: fundData, error: fundError } = await supabase
-      .from('funds')
-      .select('*')
-      .eq('id', fundId)
-      .maybeSingle();
-    if (fundError || !fundData) {
-      console.error('Error fetching fund details:', fundError);
-      setError('Failed to load fund data.');
-      setFund(null);
-      setLoading(false);
-      return;
-    }
-
-    // 2. Fetch members for this fund
-    const { data: membersData, error: membersError } = await supabase
-      .from('fund_members')
-      .select('*')
-      .eq('fund_id', fundId);
-    if (membersError) {
-      setError('Failed to load members.');
-      setLoading(false);
-      return;
-    }
-
-    // 3. Fetch contributions for this fund
-    const { data: contribsData, error: contribsError } = await supabase
-      .from('contributions')
-      .select('*')
-      .eq('fund_id', fundId)
-      .order('date', { ascending: false });
-    if (contribsError) {
-      setError('Failed to load contributions.');
-      setLoading(false);
-      return;
-    }
-
-    // 4. Fetch expenses for this fund
-    const { data: expensesData, error: expensesError } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('fund_id', fundId)
-      .order('date', { ascending: false });
-    if (expensesError) {
-      setError('Failed to load expenses.');
-      setLoading(false);
-      return;
-    }
-
-    // Map members, ensuring the owner is included as a member with admin role
-    const mappedMembers = (membersData || []).map((m: any) => ({
-      userId: m.user_id,
-      role: m.role,
-      joinedAt: m.joined_at,
-      totalContributed: Number(m.total_contributed),
-    }));
-    // Add owner as a member if not already present
-    if (fundData.owner_id) {
-      const ownerExists = mappedMembers.some((m) => m.userId === fundData.owner_id);
-      if (!ownerExists) {
-        mappedMembers.unshift({
-          userId: fundData.owner_id,
-          role: 'admin',
-          joinedAt: fundData.created_at || new Date().toISOString(),
-          totalContributed: 0,
-        });
-      }
-    }
-
-    const f: Fund = {
-      id: fundData.id,
-      name: fundData.name,
-      description: fundData.description,
-      category: fundData.category,
-      targetAmount: fundData.target_amount,
-      suggestedContribution: fundData.suggested_contribution,
-      startDate: fundData.start_date,
-      endDate: fundData.end_date,
-      currency: fundData.currency,
-      ownerId: fundData.owner_id,
-      members: mappedMembers,
-      contributions: (contribsData || []).map((c: any) => ({
-        id: c.id,
-        fundId: c.fund_id,
-        contributorId: c.contributor_id,
-        amount: Number(c.amount),
-        date: c.date,
-        status: c.status,
-        note: c.note,
-      })),
-      expenses: (expensesData || []).map((e: any) => ({
-        id: e.id,
-        fundId: e.fund_id,
-        addedById: e.added_by_id,
-        name: e.name,
-        amount: Number(e.amount),
-        vendor: e.vendor,
-        category: e.category,
-        date: e.date,
-        receiptUrl: e.receipt_url,
-        status: e.status,
-      })),
-    };
-
-    setFund(f);
+  // 1. Fetch fund record (only needed columns)
+  const { data: fundData, error: fundError } = await supabase
+    .from('funds')
+    .select('id, name, description, category, target_amount, suggested_contribution, start_date, end_date, currency, owner_id, created_at')
+    .eq('id', fundId)
+    .maybeSingle();
+  if (fundError || !fundData) {
+    console.error('Error fetching fund details:', fundError);
+    setError('Failed to load fund data.');
+    setFund(null);
     setLoading(false);
-  }, [fundId, user]);
+    return;
+  }
+
+  // 2-4. Fetch members, contributions, expenses in parallel with needed columns
+  const [{ data: membersData, error: membersError }, { data: contribsData, error: contribsError }, { data: expensesData, error: expensesError }] = await Promise.all([
+    supabase.from('fund_members').select('user_id, role, joined_at, total_contributed').eq('fund_id', fundId),
+    supabase.from('contributions').select('id, fund_id, contributor_id, amount, date, status, note').eq('fund_id', fundId).order('date', { ascending: false }),
+    supabase.from('expenses').select('id, fund_id, added_by_id, name, amount, vendor, category, date, receipt_url, status').eq('fund_id', fundId).order('date', { ascending: false })
+  ]);
+
+  if (membersError) { setError('Failed to load members.'); setLoading(false); return; }
+  if (contribsError) { setError('Failed to load contributions.'); setLoading(false); return; }
+  if (expensesError) { setError('Failed to load expenses.'); setLoading(false); return; }
+
+  // Map members, ensuring the owner is included as a member with admin role
+  const mappedMembers = (membersData || []).map((m: any) => ({
+    userId: m.user_id,
+    role: m.role,
+    joinedAt: m.joined_at,
+    totalContributed: Number(m.total_contributed),
+  }));
+  if (fundData.owner_id) {
+    const ownerExists = mappedMembers.some((m) => m.userId === fundData.owner_id);
+    if (!ownerExists) {
+      mappedMembers.unshift({
+        userId: fundData.owner_id,
+        role: 'admin',
+        joinedAt: fundData.created_at || new Date().toISOString(),
+        totalContributed: 0,
+      });
+    }
+  }
+
+  const f: Fund = {
+    id: fundData.id,
+    name: fundData.name,
+    description: fundData.description,
+    category: fundData.category,
+    targetAmount: fundData.target_amount,
+    suggestedContribution: fundData.suggested_contribution,
+    startDate: fundData.start_date,
+    endDate: fundData.end_date,
+    currency: fundData.currency,
+    ownerId: fundData.owner_id,
+    members: mappedMembers,
+    contributions: (contribsData || []).map((c: any) => ({
+      id: c.id,
+      fundId: c.fund_id,
+      contributorId: c.contributor_id,
+      amount: Number(c.amount),
+      date: c.date,
+      status: c.status,
+      note: c.note,
+    })),
+    expenses: (expensesData || []).map((e: any) => ({
+      id: e.id,
+      fundId: e.fund_id,
+      addedById: e.added_by_id,
+      name: e.name,
+      amount: Number(e.amount),
+      vendor: e.vendor,
+      category: e.category,
+      date: e.date,
+      receiptUrl: e.receipt_url,
+      status: e.status,
+    })),
+  };
+
+  setFund(f);
+  setLoading(false);
+}, [fundId, user]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -232,11 +211,7 @@ const [error, setError] = useState<string | null>(null);
     );
   }
 
-  const totalCollected = fund.contributions?.reduce((sum, c) => sum + c.amount, 0) ?? 0;
-  const totalSpent = fund.expenses?.reduce((sum, e) => sum + e.amount, 0) ?? 0;
-  const balance = totalCollected - totalSpent;
-  // Determine if current user is a member or owner of the fund
-  const isMember = fund && (fund.members?.some(m => m.userId === user?.id) || fund.ownerId === user?.id);
+
 
   return (
     <div className="min-h-screen bg-[#FAFAF8] text-[#171717] p-6">
