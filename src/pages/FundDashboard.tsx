@@ -128,7 +128,24 @@ const [error, setError] = useState<string | null>(null);
     setInviteLoading(true);
     setInviteError(null);
 
-    // Generate a 12-char cryptographically random hex code
+    // 1. First check if an active invite already exists for this fund
+    const { data: existingInvites } = await supabase
+      .from('fund_invites')
+      .select('code, expires_at')
+      .eq('fund_id', fund.id)
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (existingInvites && existingInvites.length > 0) {
+      setInviteCode(existingInvites[0].code);
+      setInviteExpiresAt(existingInvites[0].expires_at || undefined);
+      setInviteLoading(false);
+      setShowInviteModal(true);
+      return;
+    }
+
+    // 2. Generate a 12-char cryptographically random hex code
     const bytes = new Uint8Array(8);
     crypto.getRandomValues(bytes);
     const code = Array.from(bytes)
@@ -166,10 +183,10 @@ const [error, setError] = useState<string | null>(null);
 
   if (authLoading || loading) {
     return (
-      <div className="p-6 bg-[#FAFAF8] min-h-screen text-[#171717] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#087F5B] mx-auto mb-3"></div>
-          <p className="font-medium">Loading fund details...</p>
+      <div className="min-h-screen bg-[#F8FAF9] flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-neutral-200 border-t-[#087F5B] animate-spin" />
+          <p className="text-xs text-neutral-500 font-medium">Loading fund details...</p>
         </div>
       </div>
     );
@@ -177,15 +194,27 @@ const [error, setError] = useState<string | null>(null);
 
   if (error) {
     return (
-      <div className="p-6 bg-[#FAFAF8] min-h-screen text-[#171717] flex items-center justify-center">
-        <div className="max-w-md mx-auto bg-white rounded-xl shadow-md p-6 text-center border border-gray-200">
-          <p className="text-red-600 font-medium mb-4">{error}</p>
-          <button
-            onClick={fetchFund}
-            className="bg-[#087F5B] text-white px-4 py-2 rounded-md hover:bg-[#087F5B]/90 font-medium"
-          >
-            Retry
-          </button>
+      <div className="min-h-screen bg-[#F8FAF9] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-neutral-200/80 p-6 text-center">
+          <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-3 border border-red-100 font-bold">
+            !
+          </div>
+          <p className="text-sm font-semibold text-red-600 mb-1">Failed to load fund</p>
+          <p className="text-xs text-neutral-500 mb-5">{error}</p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={fetchFund}
+              className="px-4 py-2 bg-[#087F5B] text-white rounded-xl text-xs font-semibold hover:bg-[#066c4d] transition-colors"
+            >
+              Retry
+            </button>
+            <Link
+              to="/dashboard"
+              className="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-semibold hover:bg-neutral-50 transition-colors"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -193,15 +222,15 @@ const [error, setError] = useState<string | null>(null);
 
   if (!fund) {
     return (
-      <div className="p-6 text-[#171717] bg-[#FAFAF8] min-h-screen">
-        <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded-xl shadow-md border border-gray-100 text-center">
-          <p className="text-red-600 text-lg font-semibold mb-2">Fund not found</p>
-          <p className="text-gray-600 text-sm mb-6">
+      <div className="min-h-screen bg-[#F8FAF9] text-[#171717] flex items-center justify-center p-6">
+        <div className="max-w-md w-full p-8 bg-white rounded-2xl shadow-sm border border-[#EAEAE6] text-center">
+          <h2 className="text-base font-bold text-[#171717] mb-1">Fund not found</h2>
+          <p className="text-xs text-neutral-500 mb-6">
             You may not have permission to access this fund or it does not exist.
           </p>
           <Link
             to="/dashboard"
-            className="inline-block bg-[#087F5B] text-white px-4 py-2 rounded-md hover:bg-[#087F5B]/90 font-medium text-sm transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#087F5B] text-white text-xs font-semibold hover:bg-[#066c4d] transition-colors"
           >
             ← Back to Dashboard
           </Link>
@@ -210,69 +239,109 @@ const [error, setError] = useState<string | null>(null);
     );
   }
 
-
-
   return (
-    <div className="min-h-screen bg-[#FAFAF8] text-[#171717] p-6">
-      <div className="max-w-5xl mx-auto">
-        <FundHeader fund={fund} totalCollected={totalCollected} totalSpent={totalSpent} balance={balance} />
-        <div className="flex flex-wrap gap-4 mb-6 mt-4">
-          {isMember && (
-            <button
-              onClick={() => setShowContributionModal(true)}
-              className="bg-[#087F5B] text-white px-4 py-2 rounded-md hover:bg-[#087F5B]/90 font-medium text-sm transition-colors"
-            >
-              Add Contribution
-            </button>
-          )}
-          {isMember && (
-            <button
-              onClick={() => setShowExpenseModal(true)}
-              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 font-medium text-sm transition-colors"
-            >
-              Add Expense
-            </button>
-          )}
-          {user?.id === fund.ownerId && (
+    <div className="relative min-h-screen bg-[#F8FAF9] text-[#171717] overflow-x-hidden">
+      {/* Ambient Background Atmosphere */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        {/* Primary Ambient Glow: Top-Right (Poolly green #087F5B, ~6% opacity, heavily blurred) */}
+        <div 
+          className="absolute -top-32 -right-32 w-[36rem] h-[36rem] sm:w-[46rem] sm:h-[46rem] rounded-full bg-[#087F5B] opacity-[0.06] blur-[120px] sm:blur-[140px]" 
+        />
+        
+        {/* Secondary Ambient Glow: Bottom-Left (Significantly weaker ~2.5% opacity, heavily blurred) */}
+        <div 
+          className="absolute -bottom-40 -left-40 w-[24rem] h-[24rem] sm:w-[32rem] sm:h-[32rem] rounded-full bg-[#087F5B] opacity-[0.025] blur-[130px] sm:blur-[150px]" 
+        />
+
+        {/* Ultra-subtle Fine Grain Texture (~1.5% opacity) */}
+        <div
+          className="absolute inset-0 opacity-[0.015] mix-blend-multiply"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+            backgroundRepeat: 'repeat',
+          }}
+        />
+      </div>
+
+      {/* Main Fund Detail Content */}
+      <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
+          <FundHeader
+            fund={fund}
+            totalCollected={totalCollected}
+            totalSpent={totalSpent}
+            balance={balance}
+          />
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            {isMember && (
+              <button
+                onClick={() => setShowContributionModal(true)}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#087F5B] text-white text-xs sm:text-sm font-semibold shadow-sm hover:bg-[#066c4d] active:scale-[0.98] transition-all duration-150"
+              >
+                <span>+</span>
+                <span>Add Contribution</span>
+              </button>
+            )}
+            {isMember && (
+              <button
+                onClick={() => setShowExpenseModal(true)}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200/80 hover:bg-rose-100/80 text-xs sm:text-sm font-semibold active:scale-[0.98] transition-all duration-150"
+              >
+                <span>+</span>
+                <span>Add Expense</span>
+              </button>
+            )}
             <button
               onClick={createInvite}
               disabled={inviteLoading}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium text-sm transition-colors"
+              className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-white border border-neutral-200 text-neutral-800 text-xs sm:text-sm font-semibold shadow-2xs hover:bg-neutral-50 hover:border-neutral-300 active:scale-[0.98] transition-all duration-150 disabled:opacity-50"
             >
               {inviteLoading ? 'Generating...' : 'Invite / Share'}
             </button>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-2">
-            <TransactionTimeline contributions={fund.contributions} expenses={fund.expenses} />
           </div>
-          <div className="md:col-span-1">
-            <MemberList members={fund.members} ownerId={fund.ownerId} currentUserId={user?.id} />
-          </div>
-        </div>
 
-        <AddContributionModal
-          fundId={fund.id}
-          isOpen={showContributionModal}
-          onClose={() => setShowContributionModal(false)}
-          onAdded={fetchFund}
-        />
-        <AddExpenseModal
-          fundId={fund.id}
-          isOpen={showExpenseModal}
-          onClose={() => setShowExpenseModal(false)}
-          onAdded={fetchFund}
-        />
-        <InviteModal
-          isOpen={showInviteModal}
-          onClose={() => setShowInviteModal(false)}
-          inviteCode={inviteCode}
-          fundName={fund.name}
-          expiresAt={inviteExpiresAt}
-          generateError={inviteError}
-        />
+          {/* Grid Layout: Transactions (2 cols) & Members (1 col) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 items-start">
+            <div className="lg:col-span-2">
+              <TransactionTimeline
+                contributions={fund.contributions}
+                expenses={fund.expenses}
+                currencySymbol={fund.currency === 'USD' ? '$' : '₹'}
+                onAddContribution={isMember ? () => setShowContributionModal(true) : undefined}
+              />
+            </div>
+            <div className="lg:col-span-1">
+              <MemberList
+                members={fund.members}
+                ownerId={fund.ownerId}
+                currentUserId={user?.id}
+              />
+            </div>
+          </div>
+
+          <AddContributionModal
+            fundId={fund.id}
+            isOpen={showContributionModal}
+            onClose={() => setShowContributionModal(false)}
+            onAdded={fetchFund}
+          />
+          <AddExpenseModal
+            fundId={fund.id}
+            isOpen={showExpenseModal}
+            onClose={() => setShowExpenseModal(false)}
+            onAdded={fetchFund}
+          />
+          <InviteModal
+            isOpen={showInviteModal}
+            onClose={() => setShowInviteModal(false)}
+            inviteCode={inviteCode}
+            fundName={fund.name}
+            expiresAt={inviteExpiresAt}
+            generateError={inviteError}
+          />
+        </div>
       </div>
     </div>
   );

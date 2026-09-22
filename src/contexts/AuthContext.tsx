@@ -9,9 +9,10 @@ interface AuthContextValue {
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<{ error: AuthError | null }>;
-  signInWithGoogle: () => Promise<{ error: AuthError | null }>;
+  signInWithGoogle: (redirectTo?: string) => Promise<{ error: AuthError | null }>;
   signInWithPhone: (phone: string) => Promise<{ error: AuthError | null }>;
   verifyPhoneOtp: (phone: string, token: string) => Promise<{ error: AuthError | null }>;
+  resetPassword: (email: string, redirectTo?: string) => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -22,9 +23,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const getSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setUser(data.session?.user ?? null);
-      setLoading(false);
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        setUser(data.session?.user ?? null);
+      } catch (err) {
+        console.error('Session initialization error:', err);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
     };
     getSession();
 
@@ -42,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!error && data.session?.user) {
       setUser(data.session.user);
     }
-    return { error };
+    return { error, data };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -53,11 +61,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (redirectTo?: string) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: redirectTo || `${window.location.origin}/dashboard`,
         queryParams: {
           prompt: 'select_account',
         },
@@ -91,6 +99,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
+  const resetPassword = async (email: string, redirectTo?: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectTo || window.location.origin,
+    });
+    return { error };
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -102,6 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signInWithGoogle,
         signInWithPhone,
         verifyPhoneOtp,
+        resetPassword,
       }}
     >
       {children}

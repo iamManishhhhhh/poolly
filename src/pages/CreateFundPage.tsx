@@ -68,7 +68,7 @@ export default function CreateFundPage() {
     const ownerId = currentUser.id;
 
     // Insert into public.funds with owner_id = currentUser.id (matching auth.uid())
-    const { error: dbError, data } = await supabase
+    const { error: dbError } = await supabase
       .from('funds')
       .insert([
         {
@@ -88,18 +88,6 @@ export default function CreateFundPage() {
       setError(dbError.message);
       setLoading(false);
       return;
-    }
-
-    const fundId = data?.[0]?.id;
-    if (fundId) {
-      // Add creator to fund_members as admin
-      await supabase.from('fund_members').insert([
-        {
-          fund_id: fundId,
-          user_id: ownerId,
-          role: 'admin',
-        },
-      ]);
     }
 
     setLoading(false);

@@ -13,6 +13,7 @@ export default function AuthPage() {
     signInWithGoogle,
     signInWithPhone,
     verifyPhoneOtp,
+    resetPassword,
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,6 +28,7 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [phoneMode, setPhoneMode] = useState(false);
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [phone, setPhone] = useState('');
   const [otpToken, setOtpToken] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -54,9 +56,10 @@ export default function AuthPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (user && !authLoading) {
-      navigate('/dashboard', { replace: true });
+      const from = (location.state as any)?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, location]);
 
   const resetStatus = () => {
     setError(null);
@@ -66,7 +69,8 @@ export default function AuthPage() {
   const handleGoogleSignIn = async () => {
     resetStatus();
     setLoading(true);
-    const { error } = await signInWithGoogle();
+    const from = (location.state as any)?.from?.pathname || '/dashboard';
+    const { error } = await signInWithGoogle(`${window.location.origin}${from}`);
     setLoading(false);
     if (error) {
       setError(error.message);
@@ -104,7 +108,8 @@ export default function AuthPage() {
     if (error) {
       setError(error.message);
     } else {
-      navigate('/dashboard', { replace: true });
+      const from = (location.state as any)?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
     }
   };
 
@@ -118,12 +123,12 @@ export default function AuthPage() {
         return;
       }
       setLoading(true);
-      const { error } = await signUp(email, password);
+      const { error, data } = await signUp(email, password) as any;
       setLoading(false);
       if (error) {
         setError(error.message);
-      } else {
-        setMessage('Check your email for a confirmation link.');
+      } else if (data?.user && !data?.session) {
+        setMessage('Check your email for a confirmation link to verify your account.');
       }
     } else {
       setLoading(true);
@@ -131,9 +136,25 @@ export default function AuthPage() {
       setLoading(false);
       if (error) {
         setError(error.message);
-      } else {
-        navigate('/dashboard', { replace: true });
       }
+    }
+  };
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    resetStatus();
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    setLoading(true);
+    const { error } = await resetPassword(email.trim(), `${window.location.origin}/auth/login`);
+    setLoading(false);
+    if (error) {
+      setError(error.message);
+    } else {
+      setMessage('If an account exists, a password reset link has been sent to your email.');
+      setForgotPasswordMode(false);
     }
   };
 
@@ -149,7 +170,8 @@ export default function AuthPage() {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    const from = (location.state as any)?.from?.pathname || '/dashboard';
+    return <Navigate to={from} replace />;
   }
 
   return (
@@ -180,7 +202,7 @@ export default function AuthPage() {
             </div>
           )}
 
-          {!phoneMode ? (
+          {!phoneMode && !forgotPasswordMode ? (
             <>
               {/* PRIMARY HERO AUTH ACTION: Google OAuth */}
               <div className="space-y-4">
@@ -291,11 +313,23 @@ export default function AuthPage() {
 
                   <button
                     type="button"
-                    onClick={() => setShowEmailOption(false)}
+                    onClick={() => { setShowEmailOption(false); setForgotPasswordMode(false); }}
                     className="w-full text-center text-xs text-gray-500 hover:underline pt-1"
                   >
                     Hide Email Form
                   </button>
+                  {!isSignUpMode && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetStatus();
+                        setForgotPasswordMode(true);
+                      }}
+                      className="w-full text-center text-xs text-[#087F5B] hover:underline pt-1"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
                 </form>
               )}
 
@@ -326,6 +360,39 @@ export default function AuthPage() {
                 )}
               </div>
             </>
+          ) : forgotPasswordMode ? (
+            <div>
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                <Input
+                  label="Email address"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="w-full py-2.5 font-semibold"
+                  disabled={loading}
+                >
+                  {loading ? 'Sending link...' : 'Send Reset Link'}
+                </Button>
+              </form>
+              <div className="mt-6 text-center text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetStatus();
+                    setForgotPasswordMode(false);
+                  }}
+                  className="font-medium text-[#087F5B] hover:underline"
+                >
+                  ← Back to Login
+                </button>
+              </div>
+            </div>
           ) : (
             /* Phone OTP Flow */
             <div>
